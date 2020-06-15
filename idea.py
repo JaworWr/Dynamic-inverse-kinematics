@@ -117,9 +117,40 @@ def constraint_violation(constraints):
     return violations
 
 
-def IDEA(objective, n_constraints, x_min, x_max, d, n, n_inf, eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
-    n_f = n - n_inf
+def IDEA(objective, n_constraints, x_min, x_max, d, n, *args, **kwargs):
     population = random_population(d, n, x_min, x_max)
+    return sub_IDEA(population, objective, n_constraints, x_min, x_max, n, *args, **kwargs)
+
+
+def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_iterations_init, num_iterations, **kwargs):
+    population = random_population(d, n, x_min, x_max)
+
+    print("=" * 80)
+    print("t=0")
+    print("=" * 80)
+
+    round_objective = lambda population: objective(0, population)
+    p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
+                    num_iterations=num_iterations_init, **kwargs)
+    population_history = [p]
+    score_history = [s]
+
+    for t in range(1, T):
+        print("=" * 80)
+        print(f"t={t}")
+        print("=" * 80)
+
+        population = p[-1, :, :]
+        round_objective = lambda population: objective(t, population)
+        p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
+                        num_iterations=num_iterations, **kwargs)
+        population_history.append(p)
+        score_history.append(s)
+
+    return population_history, score_history
+
+def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
+    n_f = n - n_inf
     populations = [population.copy()]
     obj_results = objective(population)
     constraint_values = obj_results[:, -n_constraints:]
