@@ -117,6 +117,29 @@ def inverse_kinematics_objective(S, target, rectangles):
     return objective
 
 
+def dynamic_inverse_kinematics_objectives(S, target, target_v, rectangles, rectangle_vs):
+    rectangle_segments = [make_rectangle(*rect) for rect in rectangles]
+    rectangle_vs = [np.array(v) for v in rectangle_vs]
+    target = np.array(target)
+    target_v = np.array(target_v)
+
+    def objective(t, population):
+        population_x, population_d = alphas_to_coords(S, 0, 0, population)
+        score = np.sum((population_x[:, -1, :] - (target + t * target_v)) ** 2, 1)
+        results = [score]
+
+        for (rectangle_x, rectangle_d), rectangle_v in zip(rectangle_segments, rectangle_vs):
+            rectangle_x = rectangle_x + t * rectangle_v
+            rectangle_penalties = rectangle_total_penalty(population_x, population_d, rectangle_x, rectangle_d)
+            results.append(rectangle_penalties)
+
+        results = np.stack(results, 1)
+        results[:, 1:] = np.maximum(results[:, 1:], 0.)
+        return results
+
+    return objective
+
+
 def draw_solutions(alphas, S, target_x, target_y, rectangles, **kwargs):
     fig, ax = plt.subplots(**kwargs)
     x, d = alphas_to_coords(S, 0, 0, alphas)
