@@ -168,7 +168,7 @@ def _draw_solution(alphas, S, target, rectangles, ax):
                                        linewidth=3)
         ax.add_patch(rect_patch)
 
-    plt.scatter(target[0], target[1], c="red", s=400)
+    ax.scatter(target[0], target[1], c="red", s=400)
     ax.set_aspect("equal", "box")
     for specimen_x in x:
         ax.plot(specimen_x[:, 0], specimen_x[:, 1], marker='D')

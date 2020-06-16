@@ -142,7 +142,7 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
     def round_objective(round_population):
         return objective(t, round_population)
 
-    p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
+    p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, *args,
                     num_iterations=num_iterations_init, **kwargs)
     population_history = [p]
     score_history = [s]
@@ -153,7 +153,7 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
         print("=" * 80)
 
         population = p[-1, :, :]
-        p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
+        p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, *args,
                         num_iterations=num_iterations, **kwargs)
         population_history.append(p)
         score_history.append(s)
