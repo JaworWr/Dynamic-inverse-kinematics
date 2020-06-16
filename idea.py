@@ -130,7 +130,7 @@ def IDEA(objective, n_constraints, x_min, x_max, d, n, *args, **kwargs):
     return sub_IDEA(population, objective, n_constraints, x_min, x_max, n, *args, **kwargs)
 
 
-def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_iterations_init, num_iterations, **kwargs):
+def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_iterations_init, num_iterations, n_immigrants=0, **kwargs):
     population = random_population(d, n, x_min, x_max)
 
     print("=" * 80)
@@ -153,6 +153,9 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
         print("=" * 80)
 
         population = p[-1, :, :]
+        if n_immigrants > 0:
+            immigrants = random_population(d, n_immigrants, x_min, x_max)
+            population = np.vstack([population, immigrants])
         p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, *args,
                         num_iterations=num_iterations, **kwargs)
         population_history.append(p)
@@ -163,9 +166,9 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
 
 def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
     n_f = n - n_inf
-    populations = [population.copy()]
+    populations = []
     scores = evaluation(objective, n_constraints, population)
-    scores_hist = [scores.copy()]
+    scores_hist = []
 
     fronts, ranks = FNS(scores)
     dists = crowding_distance(scores)
