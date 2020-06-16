@@ -51,17 +51,16 @@ def alphas_to_coords(S, x0, y0, alphas):
     return x, d
 
 
-# TODO: optimize if needed
 def rectangle_penalty(s1, x1, s2, x2, rectangle_x, rectangle_d, max_h):
+    S_total = rectangle_d[0, 0] * rectangle_d[1, 1]
     if s1 == s2:
-        return np.abs(np.sum(x2 - x1)) * max_h / 2
+        return (np.abs(np.sum(x2 - x1)) + np.abs(rectangle_d[s1%2, s1%2]) * 1e-4) * max_h / 2
     elif s1 % 2 == s2 % 2:
         h = np.abs(rectangle_d[(s1 + 1) % 4, :].sum())
         s = min(s1, s2)
         a = np.abs(x1[s] - rectangle_x[0, s])
         b = np.abs(x2[s] - rectangle_x[0, s])
         S = (a + b) * h / 2
-        S_total = rectangle_d[0, 0] * rectangle_d[1, 1]
         return min(S, S_total - S)
     else:
         x = np.abs(x2 - x1)

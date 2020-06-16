@@ -2,8 +2,8 @@ import numpy as np
 
 
 def FNS(scores):
-    domination = (scores[:, None, :] <= scores[None, :, :]).all(2)  # domination[i, j] = "i dominuje j"
-    domination &= ~(scores[:, None, :] == scores[None, :, :]).all(2)
+    domination = np.all(scores[:, None, :] <= scores[None, :, :], axis=2)  # domination[i, j] = "i dominuje j"
+    domination &= np.any(scores[:, None, :] < scores[None, :, :], axis=2)
     Nx = domination.sum(0)
 
     Pf = []
@@ -117,6 +117,14 @@ def constraint_violation(constraints):
     return violations
 
 
+def evaluation(objective, n_constraints, population):
+    obj_results = objective(population)
+    constraint_values = obj_results[:, -n_constraints:]
+    violation_measure = constraint_violation(constraint_values)
+    scores = np.concatenate([obj_results[:, :-n_constraints], violation_measure[:, None]], 1)
+    return scores
+
+
 def IDEA(objective, n_constraints, x_min, x_max, d, n, *args, **kwargs):
     population = random_population(d, n, x_min, x_max)
     return sub_IDEA(population, objective, n_constraints, x_min, x_max, n, *args, **kwargs)
@@ -129,7 +137,11 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
     print("t=0")
     print("=" * 80)
 
-    round_objective = lambda population: objective(0, population)
+    t = 0
+
+    def round_objective(round_population):
+        return objective(t, round_population)
+
     p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
                     num_iterations=num_iterations_init, **kwargs)
     population_history = [p]
@@ -141,7 +153,6 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
         print("=" * 80)
 
         population = p[-1, :, :]
-        round_objective = lambda population: objective(t, population)
         p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, d, n, *args,
                         num_iterations=num_iterations, **kwargs)
         population_history.append(p)
@@ -149,13 +160,11 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
 
     return population_history, score_history
 
+
 def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
     n_f = n - n_inf
     populations = [population.copy()]
-    obj_results = objective(population)
-    constraint_values = obj_results[:, -n_constraints:]
-    violation_measure = constraint_violation(constraint_values)
-    scores = np.concatenate([obj_results[:, :-n_constraints], violation_measure[:, None]], 1)
+    scores = evaluation(objective, n_constraints, population)
     scores_hist = [scores.copy()]
 
     fronts, ranks = FNS(scores)
@@ -166,12 +175,7 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c
         offspring = crossover(population[parent_indices, :], p_c, eta_c)
         offspring = np.clip(offspring, x_min, x_max)
         offspring = mutation(offspring, x_min, x_max, p_m, eta_m)
-
-        offspring_obj_results = objective(offspring)
-        offspring_constraint_values = offspring_obj_results[:, -n_constraints:]
-        offspring_violation_measure = constraint_violation(offspring_constraint_values)
-        offspring_scores = np.concatenate(
-            [offspring_obj_results[:, :-n_constraints], offspring_violation_measure[:, None]], 1)
+        offspring_scores = evaluation(objective, n_constraints, offspring)
 
         population = np.vstack([population, offspring])
         scores = np.vstack([scores, offspring_scores])
@@ -194,26 +198,26 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c
         population_f = population[mask_f, :]
         scores_f = scores[mask_f, :]
         dists_f = dists[mask_f]
-        fronts, ranks = FNS(population_f)
-        taken_f = elitist_selection(fronts, dists_f, to_take_f)
+        fronts_f, ranks_f = FNS(scores_f)
+        taken_f = elitist_selection(fronts_f, dists_f, to_take_f)
 
-        population_inf = population[mask_inf]
+        population_inf = population[mask_inf, :]
         scores_inf = scores[mask_inf, :]
         dists_inf = dists[mask_inf]
-        fronts, ranks = FNS(population_inf)
-        taken_inf = elitist_selection(fronts, dists_inf, to_take_inf)
+        fronts_inf, ranks_inf = FNS(scores_inf)
+        taken_inf = elitist_selection(fronts_inf, dists_inf, to_take_inf)
 
         population = np.vstack([population_f[taken_f, :], population_inf[taken_inf, :]])
         scores = np.vstack([scores_f[taken_f, :], scores_inf[taken_inf, :]])
         dists = np.hstack([dists_f[taken_f], dists_inf[taken_inf]])
-        fronts, ranks = FNS(population)
+        fronts, ranks = FNS(scores)
 
         populations.append(population.copy())
         scores_hist.append(scores.copy())
 
         if iter_ % log_interval == 0:
-            print(
-                f"Iteration {iter_}, #feasible: {to_take_f}, #infeasible: {to_take_inf}, scores: {scores.min(0)} {scores.mean(0)} {scores.max(0)}")
-    print(
-        f"Iteration {iter_}, #feasible: {to_take_f}, #infeasible: {to_take_inf}, scores: {scores.min(0)} {scores.mean(0)} {scores.max(0)}")
+            print(f"Iteration {iter_}, #feasible: {to_take_f}, best: {scores_f[taken_f, :-1].min(0) if to_take_f else '-'}, " +
+                  f"#infeasible: {to_take_inf}, best: {scores_inf[taken_inf, :].min(0) if to_take_inf else '-'}")
+    print(f"Iteration {iter_}, #feasible: {to_take_f}, best: {scores_f[taken_f, :-1].min(0) if to_take_f else '-'}, " +
+          f"#infeasible: {to_take_inf}, best: {scores_inf[taken_inf, :].min(0) if to_take_inf else '-'}")
     return np.stack(populations, 0), np.stack(scores_hist, 0)
