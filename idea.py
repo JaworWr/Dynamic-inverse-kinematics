@@ -125,12 +125,45 @@ def evaluation(objective, n_constraints, population):
     return scores
 
 
+def split_and_select(population, scores, n_f, n_inf):
+    dists = crowding_distance(scores)
+    mask_f = scores[:, -1] == 0
+    population_f = population[mask_f, :]
+    scores_f = scores[mask_f, :]
+    dists_f = dists[mask_f]
+    population_inf = population[~mask_f, :]
+    scores_inf = scores[~mask_f, :]
+    dists_inf = dists[~mask_f]
+
+    s_f = population_f.shape[0]
+    s_inf = population_inf.shape[0]
+    n = n_f + n_inf
+    if s_f < n_f:
+        to_take_f = s_f
+        to_take_inf = n - s_f
+    elif s_inf < n_inf:
+        to_take_inf = s_inf
+        to_take_f = n - s_inf
+    else:
+        to_take_f = n_f
+        to_take_inf = n_inf
+
+    fronts_f, ranks_f = FNS(scores_f)
+    taken_f = elitist_selection(fronts_f, dists_f, to_take_f)
+
+    fronts_inf, ranks_inf = FNS(scores_inf)
+    taken_inf = elitist_selection(fronts_inf, dists_inf, to_take_inf)
+
+    return population_f[taken_f, :], population_inf[taken_inf, :], scores_f[taken_f, :], scores_inf[taken_inf, :]
+
+
 def IDEA(objective, n_constraints, x_min, x_max, d, n, *args, **kwargs):
     population = random_population(d, n, x_min, x_max)
     return sub_IDEA(population, objective, n_constraints, x_min, x_max, n, *args, **kwargs)
 
 
-def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_iterations_init, num_iterations, n_immigrants=0, **kwargs):
+def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, alpha_inf,
+                 *args, num_iterations_init, num_iterations, n_immigrants=0, **kwargs):
     population = random_population(d, n, x_min, x_max)
 
     print("=" * 80)
@@ -142,10 +175,14 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
     def round_objective(round_population):
         return objective(t, round_population)
 
-    p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, *args,
+    p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, alpha_inf, *args,
                     num_iterations=num_iterations_init, **kwargs)
     population_history = [p]
     score_history = [s]
+
+    n_to_keep = n - n_immigrants
+    n_inf = int(n_to_keep * alpha_inf)
+    n_f = n_to_keep - n_inf
 
     for t in range(1, T):
         print("=" * 80)
@@ -153,10 +190,15 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
         print("=" * 80)
 
         population = p[-1, :, :]
+        scores = s[-1, :, :]
         if n_immigrants > 0:
+            population_f, population_inf, scores_f, scores_inf = split_and_select(population, scores, n_f, n_inf)
+
             immigrants = random_population(d, n_immigrants, x_min, x_max)
-            population = np.vstack([population, immigrants])
-        p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, *args,
+            population = np.vstack([population_f, population_inf, immigrants])
+            assert population.shape[0] == n
+
+        p, s = sub_IDEA(population, round_objective, n_constraints, x_min, x_max, n, alpha_inf, *args,
                         num_iterations=num_iterations, **kwargs)
         population_history.append(p)
         score_history.append(s)
@@ -164,7 +206,9 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, *args, num_ite
     return population_history, score_history
 
 
-def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
+def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, alpha_inf,
+             eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
+    n_inf = int(n * alpha_inf)
     n_f = n - n_inf
     populations = []
     scores = evaluation(objective, n_constraints, population)
@@ -172,6 +216,15 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c
 
     fronts, ranks = FNS(scores)
     dists = crowding_distance(scores)
+
+    def log_message():
+        count_f = population_f.shape[0]
+        count_inf = population_inf.shape[0]
+        print(
+            f"Iteration {iter_}, " +
+            f"#feasible: {count_f}, best: {scores_f[:, :-1].min(0) if count_f > 0 else '-'}, " +
+            f"#infeasible: {count_inf}, best: {scores_inf.min(0) if count_inf > 0 else '-'}"
+        )
 
     for iter_ in range(num_iterations):
         parent_indices = tournament_selection(ranks, dists, n)
@@ -183,44 +236,17 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, n_inf, eta_c
         population = np.vstack([population, offspring])
         scores = np.vstack([scores, offspring_scores])
 
-        dists = crowding_distance(scores)
-        mask_f = scores[:, -1] == 0
-        mask_inf = ~mask_f
-        s_f = np.sum(mask_f)
-        s_inf = np.sum(mask_inf)
-        if s_f < n_f:
-            to_take_f = s_f
-            to_take_inf = n - s_f
-        elif s_inf < n_inf:
-            to_take_inf = s_inf
-            to_take_f = n - s_inf
-        else:
-            to_take_f = n_f
-            to_take_inf = n_inf
+        population_f, population_inf, scores_f, scores_inf = split_and_select(population, scores, n_f, n_inf)
 
-        population_f = population[mask_f, :]
-        scores_f = scores[mask_f, :]
-        dists_f = dists[mask_f]
-        fronts_f, ranks_f = FNS(scores_f)
-        taken_f = elitist_selection(fronts_f, dists_f, to_take_f)
-
-        population_inf = population[mask_inf, :]
-        scores_inf = scores[mask_inf, :]
-        dists_inf = dists[mask_inf]
-        fronts_inf, ranks_inf = FNS(scores_inf)
-        taken_inf = elitist_selection(fronts_inf, dists_inf, to_take_inf)
-
-        population = np.vstack([population_f[taken_f, :], population_inf[taken_inf, :]])
-        scores = np.vstack([scores_f[taken_f, :], scores_inf[taken_inf, :]])
-        dists = np.hstack([dists_f[taken_f], dists_inf[taken_inf]])
+        population = np.vstack([population_f, population_inf])
+        scores = np.vstack([scores_f, scores_inf])
         fronts, ranks = FNS(scores)
+        dists = crowding_distance(scores)
 
         populations.append(population.copy())
         scores_hist.append(scores.copy())
 
         if iter_ % log_interval == 0:
-            print(f"Iteration {iter_}, #feasible: {to_take_f}, best: {scores_f[taken_f, :-1].min(0) if to_take_f else '-'}, " +
-                  f"#infeasible: {to_take_inf}, best: {scores_inf[taken_inf, :].min(0) if to_take_inf else '-'}")
-    print(f"Iteration {iter_}, #feasible: {to_take_f}, best: {scores_f[taken_f, :-1].min(0) if to_take_f else '-'}, " +
-          f"#infeasible: {to_take_inf}, best: {scores_inf[taken_inf, :].min(0) if to_take_inf else '-'}")
+            log_message()
+    log_message()
     return np.stack(populations, 0), np.stack(scores_hist, 0)

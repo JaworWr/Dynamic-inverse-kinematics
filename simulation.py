@@ -139,13 +139,13 @@ def dynamic_inverse_kinematics_objectives(S, target, target_v, rectangles, recta
     return objective
 
 
-def draw_solutions(alphas, S, target, rectangles, **kwargs):
+def draw_solutions(alphas, S, target, rectangles, xlim=None, ylim=None, **kwargs):
     fig, ax = plt.subplots(**kwargs)
     rectangles = [make_rectangle(*rect) for rect in rectangles]
-    _draw_solution(alphas, S, target, rectangles, ax)
+    _draw_solution(alphas, S, target, rectangles, ax, xlim=xlim, ylim=ylim)
 
 
-def draw_dynamic_solutions(alphas, S, target, target_v, rectangles, rectangle_vs, ts, **kwargs):
+def draw_dynamic_solutions(alphas, S, target, target_v, rectangles, rectangle_vs, ts, xlim=None, ylim=None, **kwargs):
     target = np.array(target)
     target_v = np.array(target_v)
     rectangles = [make_rectangle(*rect) for rect in rectangles]
@@ -158,10 +158,10 @@ def draw_dynamic_solutions(alphas, S, target, target_v, rectangles, rectangle_vs
     for i, t in enumerate(ts):
         round_target = target + t*target_v
         round_rectangles = [(x + t*v, d) for (x, d), v in zip(rectangles, rectangle_vs)]
-        _draw_solution(alphas[t], S, round_target, round_rectangles, axes[i // ncols, i % ncols])
+        _draw_solution(alphas[t], S, round_target, round_rectangles, axes[i // ncols, i % ncols], xlim=xlim, ylim=ylim)
 
 
-def _draw_solution(alphas, S, target, rectangles, ax):
+def _draw_solution(alphas, S, target, rectangles, ax, xlim=None, ylim=None):
     x, d = alphas_to_coords(S, 0, 0, alphas)
     for rect_x, rect_d in rectangles:
         rect_patch = patches.Rectangle(rect_x[0, :], rect_d[0, 0], rect_d[1, 1], edgecolor="k", facecolor=(0, 0, 0, 0),
@@ -170,5 +170,9 @@ def _draw_solution(alphas, S, target, rectangles, ax):
 
     ax.scatter(target[0], target[1], c="red", s=400)
     ax.set_aspect("equal", "box")
+    if xlim:
+        ax.set_xlim(xlim)
+    if ylim:
+        ax.set_ylim(ylim)
     for specimen_x in x:
         ax.plot(specimen_x[:, 0], specimen_x[:, 1], marker='D')
