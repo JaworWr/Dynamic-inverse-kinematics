@@ -1,6 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
+import os
+
+
+def random_state(path, replace=False):
+    if os.path.exists(path) and not replace:
+        state = np.load(path, allow_pickle=True)
+        state = tuple(state)
+        np.random.set_state(state)
+    else:
+        state = np.random.get_state()
+        np.save(path, state)
 
 
 def _vector_product(x, y):
