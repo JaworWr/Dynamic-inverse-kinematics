@@ -68,8 +68,9 @@ def crossover(x, p, eta):  # simulated binary crossover
     return np.vstack([c1, c2])
 
 
-def mutation(x, x_min, x_max, p, eta):  # polynomial mutation
+def mutation(x, x_min, x_max, p, eta, p_mult=1):  # polynomial mutation
     n, d = x.shape
+    p = p * np.power(p_mult, np.arange(d)[::-1])
     mask = np.random.random((n, d)) <= p
     m = np.sum(mask)
     mi = np.random.random(m)
@@ -207,7 +208,7 @@ def dynamic_IDEA(objective, n_constraints, T, x_min, x_max, d, n, alpha_inf,
 
 
 def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, alpha_inf,
-             eta_c, eta_m, p_c, p_m, num_iterations, log_interval=10):
+             eta_c, eta_m, p_c, p_m, num_iterations, p_m_mult=1, log_interval=10):
     n_inf = int(n * alpha_inf)
     n_f = n - n_inf
     populations = []
@@ -230,7 +231,7 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, alpha_inf,
         parent_indices = tournament_selection(ranks, dists, n)
         offspring = crossover(population[parent_indices, :], p_c, eta_c)
         offspring = np.clip(offspring, x_min, x_max)
-        offspring = mutation(offspring, x_min, x_max, p_m, eta_m)
+        offspring = mutation(offspring, x_min, x_max, p_m, eta_m, p_mult=p_m_mult)
         offspring_scores = evaluation(objective, n_constraints, offspring)
 
         population = np.vstack([population, offspring])
