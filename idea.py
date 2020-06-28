@@ -53,9 +53,9 @@ def tournament_selection(ranks, dists, n):
 def crossover(x, p, eta):  # simulated binary crossover
     n, d = x.shape
     l = n // 2
-    mask = np.random.random(l) <= p
+    mask = np.random.random((l, d)) <= p
     m = np.sum(mask)
-    mi = np.random.random((m, d))
+    mi = np.random.random(m)
     beta = np.where(
         mi < 0.5,
         np.power(2 * mi, 1. / (eta + 1.)),
@@ -63,26 +63,26 @@ def crossover(x, p, eta):  # simulated binary crossover
     )
     c1 = x[:l, :].copy()
     c2 = x[l:, :].copy()
-    c1[mask, :] = 0.5 * (1 + beta) * x[:l, :][mask, :] + 0.5 * (1 - beta) * x[l:, :][mask, :]
-    c2[mask, :] = 0.5 * (1 + beta) * x[:l, :][mask, :] + 0.5 * (1 - beta) * x[l:, :][mask, :]
+    c1[mask] = 0.5 * (1 + beta) * x[:l, :][mask] + 0.5 * (1 - beta) * x[l:, :][mask]
+    c2[mask] = 0.5 * (1 + beta) * x[:l, :][mask] + 0.5 * (1 - beta) * x[l:, :][mask]
     return np.vstack([c1, c2])
 
 
 def mutation(x, x_min, x_max, p, eta):  # polynomial mutation
     n, d = x.shape
-    mask = np.random.random(x.shape[0]) <= p
+    mask = np.random.random((n, d)) <= p
     m = np.sum(mask)
-    mi = np.random.random((m, d))
+    mi = np.random.random(m)
     beta = np.where(
         mi < 0.5,
         np.power(2 * mi, 1. / (eta + 1.)) - 1.,
         1. - np.power(2. * (1 - mi), 1. / (eta + 1.))
     )
     y = x.copy()
-    y[mask, :] = np.where(
+    y[mask] = np.where(
         mi < 0.5,
-        x[mask, :] + beta * (x[mask, :] - x_min),
-        x[mask, :] + beta * (x_max - x[mask, :])
+        x[mask] + beta * (x[mask] - x_min),
+        x[mask] + beta * (x_max - x[mask])
     )
     return y
 
