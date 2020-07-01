@@ -71,6 +71,12 @@ def crossover(x, p, eta):  # simulated binary crossover
 def mutation(x, x_min, x_max, p, eta):  # polynomial mutation
     n, d = x.shape
     mask = np.random.random((n, d)) <= p
+    if isinstance(x_min, np.ndarray):
+        x_min = np.repeat(x_min[None, :], n, axis=0)
+        x_min = x_min[mask]
+    if isinstance(x_max, np.ndarray):
+        x_max = np.repeat(x_max[None, :], n, axis=0)
+        x_max = x_max[mask]
     m = np.sum(mask)
     mi = np.random.random(m)
     beta = np.where(
