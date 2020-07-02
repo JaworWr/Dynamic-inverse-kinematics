@@ -228,6 +228,7 @@ def sub_IDEA(population, objective, n_constraints, x_min, x_max, n, alpha_inf,
         count_inf = population_inf.shape[0]
         print(
             f"Iteration {iter_}, " +
+
             f"#feasible: {count_f}, best: {scores_f[:, :-1].min(0) if count_f > 0 else '-'}, " +
             f"#infeasible: {count_inf}, best: {scores_inf.min(0) if count_inf > 0 else '-'}"
         )
